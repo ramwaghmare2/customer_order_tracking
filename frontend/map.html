@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Customer Map</title>
+
+    <!-- HERE Maps CSS -->
+    <style>
+        #map {
+            height: 500px;
+            width: 100%;
+        }
+        .search-container {
+            margin: 10px;
+        }
+        .route-info {
+            margin-top: 20px;
+            font-size: 18px;
+        }
+    </style>
+
+    <!-- HERE Maps JS API -->
+    <script src="https://js.api.here.com/v3/3.1/mapsjs-core.js"></script>
+    <script src="https://js.api.here.com/v3/3.1/mapsjs-service.js"></script>
+    <script src="https://js.api.here.com/v3/3.1/mapsjs-ui.js"></script>
+    <script src="https://js.api.here.com/v3/3.1/mapsjs-mapevents.js"></script>
+    <script src="https://cdn.socket.io/4.0.0/socket.io.min.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const socket = io.connect('http://' + document.domain + ':' + location.port);
+            
+            socket.on('order_update', function(data) {
+                // Show a pop-up alert when an order update is received
+                alert(`Order Update Received!\nOrder ID: ${data.order_id}\nStatus: ${data.status}`);
+                
+                // Check if latitude and longitude are included in the data
+                if (data.latitude && data.longitude) {
+                    const lat = data.latitude; // Extract latitude
+                    const lng = data.longitude; // Extract longitude
+                    updateMapWithDeliveryBoyLocation(lat, lng); // Pass latitude and longitude
+                }
+            });
+        });
+
+        var deliveryBoyMarker; // Declare variable for delivery boy marker
+        var routeLine; // Declare variable for route line
+
+        function updateMapWithDeliveryBoyLocation(lat, lng) {
+            // Remove previous marker if necessary
+            if (deliveryBoyMarker) {
+                map.removeObject(deliveryBoyMarker);
+            }
+
+            // Create an icon using the custom image link for the delivery boy
+            var deliveryBoyIcon = new H.map.Icon('https://png.pngtree.com/png-clipart/20200701/original/pngtree-delivery-boy-with-mask-riding-bike-vector-png-image_5354632.jpg', {
+                size: { w: 50, h: 50 }, // Size of the icon
+                anchor: { x: 25, y: 50 } // Anchor the icon
+            });
+
+            // Add a new marker for the delivery boy's real-time location with the custom icon
+            deliveryBoyMarker = new H.map.Marker({ lat: lat, lng: lng }, { icon: deliveryBoyIcon });
+            map.addObject(deliveryBoyMarker);
+
+            deliveryBoyMarker.setData("Delivery Boy Location");
+            deliveryBoyMarker.addEventListener('tap', function(evt) {
+                var bubble = new H.ui.InfoBubble(evt.target.getGeometry(), {
+                    content: evt.target.getData()
+                });
+                ui.addBubble(bubble);
+            });
+
+            // Center the map on the delivery boy's new location
+            map.setCenter({ lat: lat, lng: lng });
+
+            // Get the delivery location coordinates
+            const deliveryLat = "{{ latitude }}";  // Passed from Flask
+            const deliveryLng = "{{ longitude }}";  // Passed from Flask
+
+            // Fetch and display the route
+            fetchRoute(lat, lng, deliveryLat, deliveryLng);
+
+            // Rotate the marker based on the device compass
+            if (window.DeviceOrientationEvent) {
+                window.addEventListener('deviceorientation', function(event) {
+                    var compassHeading = event.alpha; // Get compass heading
+                    deliveryBoyMarker.setRotation(-compassHeading); // Rotate marker based on compass heading
+                }, true);
+            } else {
+                console.error("DeviceOrientationEvent is not supported on this device/browser.");
+            }
+        }
+
+        function fetchRoute(startLat, startLng, endLat, endLng) {
+            // Create the routing service
+            var router = platform.getRoutingService(null, 8); // Specify the routing API version
+
+            // Define the routing parameters
+            var routingParameters = {
+                'routingMode': 'fast',
+                'transportMode': 'car',
+                'origin': `${startLat},${startLng}`,
+                'destination': `${endLat},${endLng}`,
+                'return': 'polyline,summary'
+            };
+
+            // Make the routing API call
+            router.calculateRoute(routingParameters, function(result) {
+                // Clear previous route if it exists
+                if (routeLine) {
+                    map.removeObject(routeLine);
+                }
+
+                // Extract the polyline data and draw the route on the map
+                if (result.routes.length) {
+                    var route = result.routes[0];
+                    var routeShape = route.sections[0].polyline;
+
+                    // Decode the polyline to get a series of geographical coordinates
+                    var linestring = H.geo.LineString.fromFlexiblePolyline(routeShape);
+
+                    // Create a polyline to display the route on the map
+                    routeLine = new H.map.Polyline(linestring, {
+                        style: { strokeColor: 'blue', lineWidth: 5 }
+                    });
+
+                    // Add the route polyline to the map
+                    map.addObject(routeLine);
+
+                    // Optionally, zoom the map to show the entire route
+                    map.getViewModel().setLookAtData({
+                        bounds: routeLine.getBoundingBox()
+                    });
+
+                    // Display distance and travel time in the route summary
+                    var distance = route.sections[0].summary.length / 1000; // Convert to kilometers
+                    var travelTime = route.sections[0].summary.duration / 60; // Convert to minutes
+
+                    // Display the distance and time below the h1 tag
+                    document.getElementById('route-info').innerHTML = `Distance: ${distance.toFixed(2)} km | Travel Time: ${Math.round(travelTime)} minutes`;
+                }
+            }, function(error) {
+                alert('Error calculating route: ' + error.message);
+            });
+        }
+    </script>
+</head>
+<body>
+    <h1>Customer Side Map View</h1>
+    
+    <!-- Add a div for displaying the distance and travel time -->
+    <div id="route-info" class="route-info"></div>
+
+    <div id="map"></div>
+
+    <script>
+        // Display the success message if available
+        var successMessage = "{{ success_message }}";
+        if (successMessage) {
+            alert(successMessage); // Show the message as a browser alert
+        }
+
+        // Replace with your actual HERE API key
+        var apiKey = "y24ahK7VnVrMkaDdBKCQVKKsNi2P8zTp3E-IHzmyfrQ";
+
+        // Initialize the HERE map
+        var platform = new H.service.Platform({
+            apikey: apiKey
+        });
+
+        var defaultLayers = platform.createDefaultLayers();
+
+        var map = new H.Map(
+            document.getElementById('map'),
+            defaultLayers.vector.normal.map,
+            {
+                zoom: 13,
+                center: { lat: 20.5937, lng: 78.9629 } // Default center coordinates for India
+            }
+        );
+
+        // Enable the event system on the map instance:
+        var mapEvents = new H.mapevents.MapEvents(map);
+        var behavior = new H.mapevents.Behavior(mapEvents);
+        var ui = H.ui.UI.createDefault(map, defaultLayers);
+
+        // Get delivery location and coordinates from Flask variables
+        var deliveryLocation = "{{ delivery_location }}";  // e.g., "Pune, Mumbai, Flat Number, Area"
+        var latitude = "{{ latitude }}";  // Passed from Flask
+        var longitude = "{{ longitude }}";  // Passed from Flask
+
+        // Function to add a marker on the map
+        function addMarker(lat, lng, title) {
+            var marker = new H.map.Marker({ lat: lat, lng: lng });
+            map.addObject(marker);
+            marker.setData(title);
+            marker.addEventListener('tap', function(evt) {
+                var bubble = new H.ui.InfoBubble(evt.target.getGeometry(), {
+                    content: evt.target.getData()
+                });
+                ui.addBubble(bubble);
+            });
+        }
+
+        // Set the map view to the delivery location using the coordinates passed from Flask
+        map.setCenter({ lat: latitude, lng: longitude });
+        map.setZoom(15); // Zoom in for better visibility
+
+        // Add a marker at the delivery location
+        addMarker(latitude, longitude, "Delivery Location: " + deliveryLocation);
+    </script>
+</body>
+</html>
