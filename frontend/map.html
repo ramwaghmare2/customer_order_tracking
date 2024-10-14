@@ -91,58 +91,90 @@
             }
         }
 
-        function fetchRoute(startLat, startLng, endLat, endLng) {
-            // Create the routing service
-            var router = platform.getRoutingService(null, 8); // Specify the routing API version
+        
+    var routeLines = []; // Store all route polylines
+    var routeSummaries = []; // Store route summaries (distance and time)
 
-            // Define the routing parameters
-            var routingParameters = {
-                'routingMode': 'fast',
-                'transportMode': 'car',
-                'origin': `${startLat},${startLng}`,
-                'destination': `${endLat},${endLng}`,
-                'return': 'polyline,summary'
-            };
+    function fetchRoute(startLat, startLng, endLat, endLng) {
+        // Create the routing service
+        var router = platform.getRoutingService(null, 8); // Specify the routing API version
 
-            // Make the routing API call
-            router.calculateRoute(routingParameters, function(result) {
-                // Clear previous route if it exists
-                if (routeLine) {
-                    map.removeObject(routeLine);
-                }
+        // Define the routing parameters with alternatives
+        var routingParameters = {
+            'routingMode': 'fast',
+            'transportMode': 'car',
+            'origin': `${startLat},${startLng}`,
+            'destination': `${endLat},${endLng}`,
+            'return': 'polyline,summary',
+            'alternatives': 2  // Request 2 alternative routes
+        };
 
-                // Extract the polyline data and draw the route on the map
-                if (result.routes.length) {
-                    var route = result.routes[0];
+        // Make the routing API call
+        router.calculateRoute(routingParameters, function(result) {
+            // Clear previous route lines if they exist
+            routeLines.forEach(line => map.removeObject(line));
+            routeLines = []; // Reset the array
+
+            // Check if routes are available
+            if (result.routes.length) {
+                result.routes.forEach(function(route, index) {
                     var routeShape = route.sections[0].polyline;
 
                     // Decode the polyline to get a series of geographical coordinates
                     var linestring = H.geo.LineString.fromFlexiblePolyline(routeShape);
 
-                    // Create a polyline to display the route on the map
-                    routeLine = new H.map.Polyline(linestring, {
-                        style: { strokeColor: 'blue', lineWidth: 5 }
+                    // Create a polyline for each route and display on the map
+                    var routeLine = new H.map.Polyline(linestring, {
+                        style: { 
+                            strokeColor: index === 0 ? 'blue' : (index === 1 ? 'green' : 'orange'), 
+                            lineWidth: 5 
+                        }
                     });
 
                     // Add the route polyline to the map
                     map.addObject(routeLine);
+                    routeLines.push(routeLine); // Store the route line
+
+                    // Store the summary details
+                    var distance = route.sections[0].summary.length / 1000; // Convert to kilometers
+                    var travelTime = route.sections[0].summary.duration / 60; // Convert to minutes
+                    routeSummaries.push({ distance: distance.toFixed(2), travelTime: Math.round(travelTime) });
+
+                    // Add click event listener to each route line to show details
+                    routeLine.addEventListener('tap', function() {
+                        displayRouteInfo(index); // Display info for the clicked route
+                    });
 
                     // Optionally, zoom the map to show the entire route
                     map.getViewModel().setLookAtData({
                         bounds: routeLine.getBoundingBox()
                     });
+                });
+            }
+        }, function(error) {
+            alert('Error calculating route: ' + error.message);
+        });
+    }
 
-                    // Display distance and travel time in the route summary
-                    var distance = route.sections[0].summary.length / 1000; // Convert to kilometers
-                    var travelTime = route.sections[0].summary.duration / 60; // Convert to minutes
+    function displayRouteInfo(routeIndex) {
+        // Clear the previous route info
+        document.getElementById('route-info').innerHTML = '';
 
-                    // Display the distance and time below the h1 tag
-                    document.getElementById('route-info').innerHTML = `Distance: ${distance.toFixed(2)} km | Travel Time: ${Math.round(travelTime)} minutes`;
-                }
-            }, function(error) {
-                alert('Error calculating route: ' + error.message);
+        // Display the info of the selected route
+        var selectedRoute = routeSummaries[routeIndex];
+        document.getElementById('route-info').innerHTML = 
+            `Selected Route: Distance: ${selectedRoute.distance} km | Travel Time: ${selectedRoute.travelTime} minutes`;
+
+        // Highlight the selected route and reset others
+        routeLines.forEach((line, index) => {
+            line.setStyle({
+                strokeColor: index === routeIndex ? 'red' : (index === 0 ? 'blue' : (index === 1 ? 'green' : 'orange')),
+                lineWidth: 5
             });
-        }
+        });
+    }
+
+
     </script>
 </head>
 <body>
