@@ -29,12 +29,9 @@
     <script>
         document.addEventListener('DOMContentLoaded', function() {
             const socket = io.connect('http://' + document.domain + ':' + location.port);
-            
-            socket.on('order_update', function(data) {
-                // Show a pop-up alert when an order update is received
-                alert(`Order Update Received!\nOrder ID: ${data.order_id}\nStatus: ${data.status}`);
-                
-                // Check if latitude and longitude are included in the data
+
+            // Handle delivery location updates from Kafka
+            socket.on('location_update', function(data) {
                 if (data.latitude && data.longitude) {
                     const lat = data.latitude; // Extract latitude
                     const lng = data.longitude; // Extract longitude
@@ -44,7 +41,8 @@
         });
 
         var deliveryBoyMarker; // Declare variable for delivery boy marker
-        var routeLine; // Declare variable for route line
+        var routeLines = []; // Store all route polylines
+        var routeSummaries = []; // Store route summaries (distance and time)
 
         function updateMapWithDeliveryBoyLocation(lat, lng) {
             // Remove previous marker if necessary
@@ -73,108 +71,92 @@
             // Center the map on the delivery boy's new location
             map.setCenter({ lat: lat, lng: lng });
 
-            // Get the delivery location coordinates
+            // Get the delivery location coordinates from Flask
             const deliveryLat = "{{ latitude }}";  // Passed from Flask
             const deliveryLng = "{{ longitude }}";  // Passed from Flask
 
             // Fetch and display the route
             fetchRoute(lat, lng, deliveryLat, deliveryLng);
-
-            // Rotate the marker based on the device compass
-            if (window.DeviceOrientationEvent) {
-                window.addEventListener('deviceorientation', function(event) {
-                    var compassHeading = event.alpha; // Get compass heading
-                    deliveryBoyMarker.setRotation(-compassHeading); // Rotate marker based on compass heading
-                }, true);
-            } else {
-                console.error("DeviceOrientationEvent is not supported on this device/browser.");
-            }
         }
 
-        
-    var routeLines = []; // Store all route polylines
-    var routeSummaries = []; // Store route summaries (distance and time)
+        function fetchRoute(startLat, startLng, endLat, endLng) {
+            // Create the routing service
+            var router = platform.getRoutingService(null, 8); // Specify the routing API version
 
-    function fetchRoute(startLat, startLng, endLat, endLng) {
-        // Create the routing service
-        var router = platform.getRoutingService(null, 8); // Specify the routing API version
+            // Define the routing parameters with alternatives
+            var routingParameters = {
+                'routingMode': 'fast',
+                'transportMode': 'car',
+                'origin': `${startLat},${startLng}`,
+                'destination': `${endLat},${endLng}`,
+                'return': 'polyline,summary',
+                'alternatives': 2  // Request 2 alternative routes
+            };
 
-        // Define the routing parameters with alternatives
-        var routingParameters = {
-            'routingMode': 'fast',
-            'transportMode': 'car',
-            'origin': `${startLat},${startLng}`,
-            'destination': `${endLat},${endLng}`,
-            'return': 'polyline,summary',
-            'alternatives': 2  // Request 2 alternative routes
-        };
+            // Make the routing API call
+            router.calculateRoute(routingParameters, function(result) {
+                // Clear previous route lines if they exist
+                routeLines.forEach(line => map.removeObject(line));
+                routeLines = []; // Reset the array
 
-        // Make the routing API call
-        router.calculateRoute(routingParameters, function(result) {
-            // Clear previous route lines if they exist
-            routeLines.forEach(line => map.removeObject(line));
-            routeLines = []; // Reset the array
+                // Check if routes are available
+                if (result.routes.length) {
+                    result.routes.forEach(function(route, index) {
+                        var routeShape = route.sections[0].polyline;
 
-            // Check if routes are available
-            if (result.routes.length) {
-                result.routes.forEach(function(route, index) {
-                    var routeShape = route.sections[0].polyline;
+                        // Decode the polyline to get a series of geographical coordinates
+                        var linestring = H.geo.LineString.fromFlexiblePolyline(routeShape);
 
-                    // Decode the polyline to get a series of geographical coordinates
-                    var linestring = H.geo.LineString.fromFlexiblePolyline(routeShape);
+                        // Create a polyline for each route and display on the map
+                        var routeLine = new H.map.Polyline(linestring, {
+                            style: { 
+                                strokeColor: index === 0 ? 'blue' : (index === 1 ? 'green' : 'orange'), 
+                                lineWidth: 5 
+                            }
+                        });
 
-                    // Create a polyline for each route and display on the map
-                    var routeLine = new H.map.Polyline(linestring, {
-                        style: { 
-                            strokeColor: index === 0 ? 'blue' : (index === 1 ? 'green' : 'orange'), 
-                            lineWidth: 5 
-                        }
+                        // Add the route polyline to the map
+                        map.addObject(routeLine);
+                        routeLines.push(routeLine); // Store the route line
+
+                        // Store the summary details
+                        var distance = route.sections[0].summary.length / 1000; // Convert to kilometers
+                        var travelTime = route.sections[0].summary.duration / 60; // Convert to minutes
+                        routeSummaries.push({ distance: distance.toFixed(2), travelTime: Math.round(travelTime) });
+
+                        // Add click event listener to each route line to show details
+                        routeLine.addEventListener('tap', function() {
+                            displayRouteInfo(index); // Display info for the clicked route
+                        });
+
+                        // Optionally, zoom the map to show the entire route
+                        map.getViewModel().setLookAtData({
+                            bounds: routeLine.getBoundingBox()
+                        });
                     });
-
-                    // Add the route polyline to the map
-                    map.addObject(routeLine);
-                    routeLines.push(routeLine); // Store the route line
-
-                    // Store the summary details
-                    var distance = route.sections[0].summary.length / 1000; // Convert to kilometers
-                    var travelTime = route.sections[0].summary.duration / 60; // Convert to minutes
-                    routeSummaries.push({ distance: distance.toFixed(2), travelTime: Math.round(travelTime) });
-
-                    // Add click event listener to each route line to show details
-                    routeLine.addEventListener('tap', function() {
-                        displayRouteInfo(index); // Display info for the clicked route
-                    });
-
-                    // Optionally, zoom the map to show the entire route
-                    map.getViewModel().setLookAtData({
-                        bounds: routeLine.getBoundingBox()
-                    });
-                });
-            }
-        }, function(error) {
-            alert('Error calculating route: ' + error.message);
-        });
-    }
-
-    function displayRouteInfo(routeIndex) {
-        // Clear the previous route info
-        document.getElementById('route-info').innerHTML = '';
-
-        // Display the info of the selected route
-        var selectedRoute = routeSummaries[routeIndex];
-        document.getElementById('route-info').innerHTML = 
-            `Selected Route: Distance: ${selectedRoute.distance} km | Travel Time: ${selectedRoute.travelTime} minutes`;
-
-        // Highlight the selected route and reset others
-        routeLines.forEach((line, index) => {
-            line.setStyle({
-                strokeColor: index === routeIndex ? 'red' : (index === 0 ? 'blue' : (index === 1 ? 'green' : 'orange')),
-                lineWidth: 5
+                }
+            }, function(error) {
+                alert('Error calculating route: ' + error.message);
             });
-        });
-    }
+        }
 
+        function displayRouteInfo(routeIndex) {
+            // Clear the previous route info
+            document.getElementById('route-info').innerHTML = '';
 
+            // Display the info of the selected route
+            var selectedRoute = routeSummaries[routeIndex];
+            document.getElementById('route-info').innerHTML = 
+                `Selected Route: Distance: ${selectedRoute.distance} km | Travel Time: ${selectedRoute.travelTime} minutes`;
+
+            // Highlight the selected route and reset others
+            routeLines.forEach((line, index) => {
+                line.setStyle({
+                    strokeColor: index === routeIndex ? 'red' : (index === 0 ? 'blue' : (index === 1 ? 'green' : 'orange')),
+                    lineWidth: 5
+                });
+            });
+        }
     </script>
 </head>
 <body>

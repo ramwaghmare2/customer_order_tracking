@@ -2,7 +2,7 @@ from flask import Flask, render_template, redirect, jsonify, request
 from flask_socketio import SocketIO, emit
 from routes import customer_routes
 from kafka_producer import produce_message
-from kafka_consumer import consume_messages
+from kafka_consumer import consume_messages,consume_delivery_location
 from config import Config  # Import the config class
 from models import init_db, db
 from flask_migrate import Migrate
@@ -71,8 +71,19 @@ def start_kafka_consumer():
     with app.app_context():
         consume_messages(socketio)
 
+def start_delivery_location_consumer():
+    with app.app_context():
+        consume_delivery_location(socketio)
+
 if __name__ == "__main__":
+        # Thread for order update consumer
         consumer_thread = threading.Thread(target=start_kafka_consumer)
         consumer_thread.daemon = True 
         consumer_thread.start()
+
+        # Thread for delivery location consumer
+        location_thread = threading.Thread(target=start_delivery_location_consumer)
+        location_thread.daemon = True
+        location_thread.start()
+
         socketio.run(app, debug=True)
