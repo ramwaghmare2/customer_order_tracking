@@ -5,7 +5,7 @@ from flask_socketio import SocketIO,emit
 def get_kafka_consumer():
     return KafkaConsumer(
         'order_status',
-        bootstrap_servers='kafka:9092',
+        bootstrap_servers='customer_order_kafka:9092',
         value_deserializer=lambda x: json.loads(x.decode('utf-8'))
     )
 
