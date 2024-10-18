@@ -8,6 +8,32 @@ This system consists of two main components:
 
 Both components communicate with each other using Kafka to exchange real-time order and delivery status updates. The system is built with Flask, Kafka, MySQL, and Docker, and is deployed on AWS EC2.
 
+## Features
+
+### Customer Order Tracking
+- Customers can place orders.
+- Orders are assigned a status (pending, accepted, delivered).
+- Customers can view real-time updates on their order status.
+- Real-time tracking of the delivery boy on a map once the order is accepted.
+
+### Delivery Boy Tracking
+- Delivery boys can accept or reject orders assigned to them.
+- View customer details (name, address, coordinates) after accepting an order.
+- Update order status as they proceed with delivery.
+- Real-time location updates for customers.
+
+### Communication via Kafka
+- **Order Messages**: The customer sends order details to the Kafka topic (`order_topic`).
+- **Delivery Updates**: Delivery boys consume order details from Kafka, update status, and send real-time location data to Kafka, which is consumed by the customer interface.
+
+## Technologies Used
+
+- **Backend**: Python, Flask, Flask-SocketIO, Kafka
+- **Frontend**: HTML, CSS, JavaScript (Leaflet.js for map, Bootstrap for styling)
+- **Database**: MySQL (via SQLAlchemy)
+- **Messaging Queue**: Apache Kafka (producer and consumer setup for customer and delivery boy)
+- **Real-time Map**: Leaflet.js for displaying real-time location on the map.
+
 ## Project Structure
 
 ### 1. Customer Order Tracking
@@ -96,22 +122,75 @@ The application is deployed on AWS EC2 using Docker Compose. Each EC2 instance h
 - Docker & Docker Compose
 - Leaflet.js for real-time maps (customer front end)
 
----
+## Setup Instructions
 
-## How to Run Locally
+### 1. Prerequisites
+- Python 3.x
+- Apache Kafka
+- Zookeeper
+- MySQL
+- Node.js (optional for certain frontend dependencies)
 
-1. **Install dependencies**:
-   ```
-   pip install -r requirements.txt
+### 2. Clone the Repository
+
+```bash
+git clone https://github.com/your_username/customer_delivery_tracking.git
+cd customer_order_tracking
+```
+
+### 3. Install Dependencies
+
+For both the customer and delivery boy projects, install the required Python packages:
+
+```bash
+pip install -r backend/requirements.txt
+```
+
+### 4. Configure MySQL
+
+Create the required MySQL databases and tables for both customer and delivery boy models. Set your database connection in `config.py`.
+
+### 5. Start Kafka & Zookeeper
+
+Run Zookeeper and Kafka locally:
+
+```bash
+# Start Zookeeper
+.\bin\windows\zookeeper-server-start.bat .\config\zookeeper.properties
+
+# Start Kafka
+.\bin\windows\kafka-server-start.bat .\config\server.properties
+```
+
+### 6. Start the Backend Services
+
+Start both the customer and delivery boy Flask apps:
+
+```bash
+# In customer_order_tracking/backend
+python app.py
+
+# In delivery_boy_tracking/backend
+python app.py
+```
+
+### 7. Run Kafka Consumer and Producer
+
+Ensure that your Kafka producer (for the customer) and Kafka consumer (for the delivery boy) are running and listening on the appropriate topics (`order_topic` for orders).
+
+### 8. Open the Frontend
+
+You can access the frontend by opening the `index.html` files for both customers and delivery boys.
+
+- **Customer**: Place orders and track status at `customer_order_tracking/frontend/index.html`.
+- **Delivery Boy**: Accept/reject orders and track deliveries at `delivery_boy_tracking/frontend/delivery_home.html`.
+
+### 9. Real-Time Updates
+
+- When a customer places an order, the delivery boy receives customer details in real-time.
+- Once the delivery boy accepts the order, the customer can track the delivery boy's location.
+
    ```
 
-2. **Start Kafka & Zookeeper** (locally):
-   ```
-   bin\windows\zookeeper-server-start.bat config\zookeeper.properties
-   bin\windows\kafka-server-start.bat config\server.properties
-   ```
 
-3. **Start Flask applications** for both customer and delivery boy systems:
-   ```
-   python backend/app.py
-   ```
+
