@@ -13,63 +13,14 @@ Both components communicate with each other using Kafka to exchange real-time or
 ### 1. Customer Order Tracking
 ![image](https://github.com/user-attachments/assets/a2dc1b01-6b35-43d1-ad67-c8eece314ac4)
 
-customer_order_tracking/
-├── backend/
-│   ├── app.py                      # Main Flask application for customer
-│   ├── kafka_producer.py            # Kafka producer for placing orders and sending updates
-│   ├── models/
-│   │   ├── __init__.py             # SQLAlchemy setup
-│   │   ├── customer.py             # Customer model
-│   │   └── order.py                # Order model
-│   └── routes/
-│       └── customer_routes.py       # Customer-related routes
-│   ├── services/
-│       ├── order_service.py         # Logic for placing and tracking orders
-│   ├── config.py                    # Configuration (Kafka, MySQL, etc.)
-│   ├── requirements.txt             # Project dependencies
-├── frontend/
-│   ├── index.html                   # Main form for placing orders
-│   ├── add_customer.html            # Form for adding a customer
-│   ├── order_status.html            # Displays order status
-│   ├── map.html                     # Displays real-time map with order tracking
-│   ├── app.js                       # JavaScript logic for API calls and order management
-│   └── api/
-│       └── api.js                   # API calls for customer actions
-├── docker/
-│   ├── Dockerfile                   # Docker setup for customer system
-│   ├── docker-compose.yml           # Docker Compose for managing services
-└── README.md                        # Documentation for customer order tracking system
+
 ```
 
 ### 2. Delivery Boy Tracking
 
 ```
-delivery_boy_tracking/
-├── backend/
-│   ├── app.py                      # Main Flask application for delivery boy
-│   ├── kafka_consumer.py            # Kafka consumer for receiving customer orders
-│   ├── kafka_producer.py            # Kafka producer for delivery status updates
-│   ├── models/
-│   │   ├── delivery_boy.py          # Delivery Boy model
-│   │   └── order.py                # Order model (shared with customer)
-│   └── routes/
-│       ├── delivery_routes.py       # Delivery actions (accept/reject orders, update location)
-│   ├── services/
-│       ├── delivery_service.py      # Logic for order acceptance, location updates
-│       ├── location_service.py      # Real-time location tracking
-│   ├── config.py                    # Configuration (Kafka, MySQL, etc.)
-│   ├── requirements.txt             # Project dependencies
-├── frontend/
-│   ├── delivery_home.html           # Home page for viewing and accepting/rejecting orders
-│   ├── delivery_tracking.html       # Real-time delivery tracking page
-│   ├── styles.css                   # Styling for delivery boy page
-│   ├── app.js                       # JavaScript for API interactions and tracking
-│   └── api/
-│       └── api.js                   # API calls for delivery boy actions
-├── docker/
-│   ├── Dockerfile                   # Docker setup for delivery boy system
-│   ├── docker-compose.yml           # Docker Compose for managing services
-└── README.md                        # Documentation for delivery boy tracking system
+![image](https://github.com/user-attachments/assets/24cd44f2-cf19-486f-96dc-75e3dcafdb02)
+
 ```
 
 ---
