@@ -11,6 +11,7 @@ Both components communicate with each other using Kafka to exchange real-time or
 ## Project Structure
 
 ### 1. Customer Order Tracking
+![image](https://github.com/user-attachments/assets/a2dc1b01-6b35-43d1-ad67-c8eece314ac4)
 
 customer_order_tracking/
 ├── backend/
