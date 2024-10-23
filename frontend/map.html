@@ -90,7 +90,7 @@
                 'origin': `${startLat},${startLng}`,
                 'destination': `${endLat},${endLng}`,
                 'return': 'polyline,summary',
-                'alternatives': 2  // Request 2 alternative routes
+                'alternatives': 1  // Request 1 alternative 
             };
 
             // Make the routing API call
@@ -199,7 +199,7 @@
         var ui = H.ui.UI.createDefault(map, defaultLayers);
 
         // Get delivery location and coordinates from Flask variables
-        var deliveryLocation = "{{ delivery_location }}";  // e.g., "Pune, Mumbai, Flat Number, Area"
+        var deliveryLocation = "{{ delivery_location }}";  // e.g., "Pass from Flask"
         var latitude = "{{ latitude }}";  // Passed from Flask
         var longitude = "{{ longitude }}";  // Passed from Flask
 
